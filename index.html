@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת ניווט: קרית הכבאות</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #1a2a6c;
+            --accent: #f44336; /* אדום כבאות */
+            --bg: #f0f2f5;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            margin: 0;
+            background-color: var(--bg);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(to right, #b21f1f, #1a2a6c);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+
+        /* פאנל שליחה ומידע */
+        .sidebar {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            height: fit-content;
+        }
+
+        .search-box {
+            margin-bottom: 25px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Heebo';
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        select:focus { border-color: var(--primary); }
+
+        .result-card {
+            background: #f8f9fa;
+            border-right: 6px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            display: none; /* יופיע בבחירה */
+        }
+
+        .result-card.active { 
+            display: block; 
+            border-color: var(--accent);
+            animation: fadeIn 0.4s ease;
+        }
+
+        /* אזור המפה */
+        .map-section {
+            background: var(--white);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .map-image {
+            width: 100%;
+            display: block;
+            border-radius: 4px;
+        }
+
+        /* נקודות לחיצה שקופות */
+        .hotspot {
+            position: absolute;
+            background: rgba(255, 255, 255, 0);
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .hotspot:hover {
+            background: rgba(244, 67, 54, 0.2);
+            border: 2px solid var(--accent);
+        }
+
+        .hotspot.selected {
+            background: rgba(244, 67, 54, 0.3);
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 15px var(--accent);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* התאמה לנייד */
+        @media (max-width: 900px) {
+            .main-container { grid-template-columns: 1fr; }
+            header h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>מפת התמצאות קרית הכבאות</h1>
+    <p>בחר כיתה מהרשימה או לחץ על המפה</p>
+</header>
+
+<div class="main-container">
+    <div class="sidebar">
+        <div class="search-box">
+            <label style="font-weight: bold; display: block; margin-bottom: 8px;">חיפוש כיתה:</label>
+            <select id="classSelector">
+                <option value="">-- בחר כיתה --</option>
+            </select>
+        </div>
+
+        <div id="resultCard" class="result-card">
+            <h2 id="resName" style="margin-top:0; color:var(--primary)"></h2>
+            <p><strong>מבנה:</strong> <span id="resBuilding"></span></p>
+            <p><strong>קומה:</strong> <span id="resFloor"></span></p>
+            <p><strong>צד/מיקום:</strong> <span id="resSide"></span></p>
+        </div>
+    </div>
+
+    <div class="map-section">
+        <div class="map-container" id="mapWrapper">
+            <img src="map.jpg" alt="Map" class="map-image">
+        </div>
+    </div>
+</div>
+
+<script>
+    // נתוני הכיתות
+    const data = [
+        { id: "gaash", name: "געש", bld: "בניין התחנה", flr: "קרקע", side: "-", coords: [68, 70, 15, 15] },
+        { id: "nesher", name: "נשר", bld: "בניין התחנה", flr: "3", side: "מזרחי", coords: [18, 64, 7, 12] },
+        { id: "almog", name: "אלמוג", bld: "בניין התחנה", flr: "3", side: "מזרחי", coords: [18, 71, 7, 12] },
+        { id: "eshed", name: "אשד", bld: "בניין התחנה", flr: "3", side: "מזרחי", coords: [18, 79, 7, 12] },
+        { id: "saar", name: "סער", bld: "בניין התחנה", flr: "3", side: "מזרחי", coords: [18, 87, 7, 12] },
+        { id: "alon", name: "אלון", bld: "בניין התחנה", flr: "3", side: "מערבי", coords: [45, 60, 8, 14] },
+        { id: "rotem", name: "רותם", bld: "בניין התחנה", flr: "3", side: "מערבי", coords: [45, 68, 8, 14] },
+        { id: "sela", name: "סלע", bld: "בניין התחנה", flr: "3", side: "מערבי", coords: [45, 76, 8, 14] },
+        { id: "hadas", name: "הדס", bld: "בניין המכללה", flr: "קרקע", side: "מערבי", coords: [72, 18, 10, 15] },
+        { id: "bengurion", name: "בן גוריון", bld: "בניין המכללה", flr: "1", side: "מערבי", coords: [51, 15, 8, 14] },
+        { id: "rimon", name: "רימון", bld: "בניין המכללה", flr: "1", side: "-", coords: [51, 23, 6, 14] },
+        { id: "teana", name: "תאנה", bld: "בניין המכללה", flr: "1", side: "-", coords: [51, 29, 6, 14] },
+        { id: "tamar", name: "תמר", bld: "בניין המכללה", flr: "1", side: "-", coords: [51, 35, 6, 14] },
+        { id: "gefen", name: "גפן", bld: "בניין המכללה", flr: "1", side: "-", coords: [51, 41, 6, 14] },
+        { id: "shaked", name: "שקד", bld: "בניין המכללה", flr: "1", side: "מזרחי", coords: [43, 47, 6, 10] },
+        { id: "shalhevet", name: "שלהבת", bld: "בניין המכללה", flr: "2", side: "מזרחי", coords: [24, 25, 8, 13] },
+        { id: "lapid", name: "לפיד", bld: "בניין המכללה", flr: "2", side: "מזרחי", coords: [24, 33, 7, 13] }
+    ];
+
+    const selector = document.getElementById('classSelector');
+    const wrapper = document.getElementById('mapWrapper');
+    const card = document.getElementById('resultCard');
+
+    // אתחול רשימה ונקודות
+    function init() {
+        data.sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
+            // רשימה
+            let opt = new Option(item.name, item.id);
+            selector.add(opt);
+
+            // נקודות לחיצה
+            let hs = document.createElement('div');
+            hs.className = 'hotspot';
+            hs.id = 'hs-' + item.id;
+            hs.style.top = item.coords[0] + '%';
+            hs.style.left = item.coords[1] + '%';
+            hs.style.width = item.coords[2] + '%';
+            hs.style.height = item.coords[3] + '%';
+            
+            hs.onclick = () => showInfo(item.id);
+            wrapper.appendChild(hs);
+        });
+    }
+
+    function showInfo(id) {
+        const item = data.find(i => i.id === id);
+        if(!item) return;
+
+        // עדכון טקסט
+        selector.value = id;
+        document.getElementById('resName').textContent = "כיתת " + item.name;
+        document.getElementById('resBuilding').textContent = item.bld;
+        document.getElementById('resFloor').textContent = item.flr;
+        document.getElementById('resSide').textContent = item.side;
+
+        // אפקטים ויזואליים
+        card.classList.add('active');
+        document.querySelectorAll('.hotspot').forEach(h => h.classList.remove('selected'));
+        document.getElementById('hs-' + id).classList.add('selected');
+    }
+
+    selector.onchange = (e) => showInfo(e.target.value);
+
+    window.onload = init;
+</script>
+
+</body>
+</html>
